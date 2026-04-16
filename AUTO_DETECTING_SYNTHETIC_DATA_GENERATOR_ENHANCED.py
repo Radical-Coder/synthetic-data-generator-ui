@@ -1109,7 +1109,7 @@ def generate_synthetic(file_path, num_rows=None, output_path=None, show_plot=Fal
     return synthetic_df
 
 
-
+# Example usage when running as a script
 if __name__ == "__main__":
     # Generate synthetic data with dashboard and statistics
     synthetic_data = generate_synthetic(
