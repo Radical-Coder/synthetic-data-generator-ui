@@ -304,6 +304,8 @@ with st.sidebar:
     - **Categorical**: Text categories
     - **Boolean**: True/False values
     - **DateTime**: Dates & timestamps
+    - **Email**: Fake email generation
+    - **Phone**: Fake phone number generation
     """)
     
     st.header("Current Status")
@@ -557,9 +559,19 @@ with tab1:
                         method = info['method']
                         if col in active_ref_tables:
                             method = f"reference_table_sampling ({len(active_ref_tables[col]):,} values)"
+                        # Friendly display names
+                        type_display = {
+                            'email': 'email',
+                            'phone': 'phone',
+                            'categorical': 'categorical',
+                            'boolean': 'boolean',
+                            'discrete_numeric': 'discrete_numeric',
+                            'continuous_numeric': 'continuous_numeric',
+                            'datetime': 'datetime'
+                        }.get(info['type'], info['type'])
                         detection_data.append({
                             'Column': col,
-                            'Detected Type': info['type'],
+                            'Detected Type': type_display,
                             'Generation Method': method
                         })
                     
@@ -1008,6 +1020,6 @@ st.markdown("""
 <div style='text-align: center; color: #666; padding: 2rem;'>
     <b>Auto-Detecting Synthetic Data Generator</b><br>
     Developed by Robel <br>
-    © 2026 | Version 1.0
+    © 2026 | Version 1.1
 </div>
 """, unsafe_allow_html=True)
