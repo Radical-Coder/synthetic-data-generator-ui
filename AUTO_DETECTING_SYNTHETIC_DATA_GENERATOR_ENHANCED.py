@@ -7,9 +7,24 @@ Automatic Synthetic Data Generator with Type Detection
 This module provides intelligent synthetic data generation with automatic column type detection.
 It uses Gaussian Mixture Models (GMM) for continuous data and categorical sampling for discrete data.
 
-Enhanced with DateTime and Boolean support.
+Supported Data Types:
+- Continuous Numeric: GMM-based generation with skewness handling
+- Discrete Numeric: Categorical sampling preserving exact frequency distribution
+- Categorical: Frequency-based sampling with optional reference table support
+- Boolean: Binary sampling preserving True/False ratio
+- DateTime: Range-preserving generation with business day and hour pattern detection
+- Email: Realistic fake email generation preserving domain distribution
+- Phone: Fake phone number generation preserving original format (parentheses, dashes, plain, international)
+
+Features:
+- Auto-detection of all column types — no manual labeling required
+- Reference table support for categorical columns
+- Quality validation with warnings
+- JSON and CSV input support
 
 Author: Robel
+Version: 1.1
+Last Updated: 2026
 """
 
 import pandas as pd
@@ -18,6 +33,9 @@ from sklearn.mixture import GaussianMixture
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
+import re
+import random
+import string
 from datetime import datetime, timedelta
 warnings.filterwarnings('ignore')
 
@@ -28,11 +46,15 @@ class AutoDetectingSyntheticGenerator:
     statistical properties of the original dataset.
     
     Features:
-    - Automatic detection of categorical, discrete numeric, continuous numeric, DateTime, and Boolean columns
-    - GMM-based generation for continuous data with skewness handling
-    - Categorical sampling for discrete data
-    - DateTime generation with pattern preservation
-    - Quality validation and warnings
+    - Auto-detection of 7 data types: continuous numeric, discrete numeric, categorical,
+      boolean, datetime, email, and phone number
+    - GMM-based generation for continuous numeric data with skewness handling
+    - Frequency-based categorical sampling preserving exact distributions
+    - DateTime generation with business day and hour pattern preservation
+    - Realistic email generation preserving domain distribution from original data
+    - Phone number generation preserving original format (parentheses, dashes, plain, international)
+    - Reference table support for categorical columns
+    - Quality validation with automatic warnings
     
     Attributes:
         max_gmm_components (int): Maximum number of Gaussian components for GMM fitting
@@ -65,11 +87,13 @@ class AutoDetectingSyntheticGenerator:
         Automatically detect the type and generation method for a column.
         
         Detection logic:
-        1. DateTime columns → temporal pattern generation
-        2. Boolean columns → categorical sampling
-        3. Numeric with low unique ratio → discrete numeric (categorical sampling)
-        4. Numeric with high unique ratio → continuous numeric (GMM)
-        5. Object/categorical dtype → categorical sampling
+        1. Email columns → realistic fake email generation
+        2. Phone columns → fake phone number generation preserving format
+        3. DateTime columns → temporal pattern generation
+        4. Boolean columns → categorical sampling
+        5. Numeric with low unique ratio → discrete numeric (categorical sampling)
+        6. Numeric with high unique ratio → continuous numeric (GMM)
+        7. Object/categorical dtype → categorical sampling
         
         Args:
             column_name (str): Name of the column
@@ -91,6 +115,33 @@ class AutoDetectingSyntheticGenerator:
         unique_ratio = unique_count / total_count
         dtype = clean_series.dtype
         
+        # EMAIL DETECTION — works for object, str, and string dtypes (pandas 2 and 3)
+        is_string_col = (pd.api.types.is_object_dtype(clean_series) or 
+                         clean_series.dtype.name in ['object', 'str', 'string', 'StringDtype'] or
+                         str(clean_series.dtype) in ['object', 'str', 'string'])
+        if is_string_col:
+            try:
+                sample = clean_series.dropna().head(100).astype(str)
+                if len(sample) > 0:
+                    email_matches = sum(1 for x in sample if re.match(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$', x.strip()))
+                    if email_matches / len(sample) > 0.7:
+                        domains = pd.Series([x.split('@')[-1] if '@' in x else 'example.com' for x in sample]).value_counts(normalize=True)
+                        return {
+                            "type": "email",
+                            "method": "email_generation",
+                            "domains": domains
+                        }
+                    # PHONE NUMBER DETECTION
+                    phone_matches = sum(1 for x in sample if re.match(r'^[\+\(]?[\d\s\-\(\)\.]{7,20}$', x.strip()))
+                    if phone_matches / len(sample) > 0.7:
+                        return {
+                            "type": "phone",
+                            "method": "phone_generation",
+                            "sample_formats": sample.tolist()[:10]
+                        }
+            except Exception:
+                pass
+
         # DATETIME DETECTION
         if pd.api.types.is_datetime64_any_dtype(clean_series):
             return self._detect_datetime_pattern(clean_series)
@@ -366,6 +417,77 @@ class AutoDetectingSyntheticGenerator:
         synthetic_values = np.random.choice(categories, size=rows, p=probabilities)
         return synthetic_values
     
+    def generate_email(self, seed_series, rows, column_name):
+        """
+        Generate realistic fake email addresses.
+        Preserves domain distribution from original data.
+        """
+        info = self.column_info[column_name]
+        domains = info.get('domains', None)
+
+        first_names = ['james','john','robert','michael','william','david','richard','joseph',
+                       'thomas','charles','mary','patricia','jennifer','linda','barbara','susan',
+                       'jessica','sarah','karen','lisa','emma','olivia','sophia','isabella',
+                       'mia','emily','abigail','madison','elizabeth','avery']
+        last_names = ['smith','johnson','williams','brown','jones','garcia','miller','davis',
+                      'wilson','taylor','anderson','thomas','jackson','white','harris','martin',
+                      'thompson','young','allen','king','wright','scott','green','baker','adams',
+                      'nelson','hill','ramirez','campbell','mitchell']
+        separators = ['.', '_', '']
+
+        emails = []
+        domain_list = domains.index.tolist() if domains is not None else ['gmail.com','yahoo.com','outlook.com']
+        domain_probs = domains.values.tolist() if domains is not None else [0.5, 0.3, 0.2]
+
+        for _ in range(rows):
+            fn = random.choice(first_names)
+            ln = random.choice(last_names)
+            sep = random.choice(separators)
+            num = random.choice(['', str(random.randint(1, 99))])
+            domain = np.random.choice(domain_list, p=domain_probs)
+            email = f"{fn}{sep}{ln}{num}@{domain}"
+            emails.append(email)
+
+        return np.array(emails)
+
+    def generate_phone(self, seed_series, rows, column_name):
+        """
+        Generate realistic fake phone numbers.
+        Detects format from original data and preserves it.
+        """
+        info = self.column_info[column_name]
+        sample_formats = info.get('sample_formats', ['(555) 000-0000'])
+
+        # Detect format from sample
+        sample = sample_formats[0] if sample_formats else '(555) 000-0000'
+
+        # Determine format type
+        if sample.startswith('+'):
+            fmt = 'international'
+        elif sample.startswith('('):
+            fmt = 'us_parentheses'
+        elif '-' in sample:
+            fmt = 'dashes'
+        else:
+            fmt = 'plain'
+
+        phones = []
+        for _ in range(rows):
+            area = random.randint(200, 999)
+            prefix = random.randint(200, 999)
+            line = random.randint(1000, 9999)
+
+            if fmt == 'international':
+                phones.append(f"+1{area}{prefix}{line}")
+            elif fmt == 'us_parentheses':
+                phones.append(f"({area}) {prefix}-{line}")
+            elif fmt == 'dashes':
+                phones.append(f"{area}-{prefix}-{line}")
+            else:
+                phones.append(f"{area}{prefix}{line}")
+
+        return np.array(phones)
+
     def generate_datetime(self, seed_series, rows, column_name):
         """
         Generate synthetic datetime data preserving temporal patterns.
@@ -566,6 +688,10 @@ class AutoDetectingSyntheticGenerator:
                 synthetic_df[col] = self.generate_categorical(seed_df[col], num_rows, col)
             elif col_type == 'datetime':
                 synthetic_df[col] = self.generate_datetime(seed_df[col], num_rows, col)
+            elif col_type == 'email':
+                synthetic_df[col] = self.generate_email(seed_df[col], num_rows, col)
+            elif col_type == 'phone':
+                synthetic_df[col] = self.generate_phone(seed_df[col], num_rows, col)
             else:
                 print(f"  Skipping {col} (type: {col_type})")
         
@@ -983,7 +1109,7 @@ def generate_synthetic(file_path, num_rows=None, output_path=None, show_plot=Fal
     return synthetic_df
 
 
-# Example usage when running as a script
+
 if __name__ == "__main__":
     # Generate synthetic data with dashboard and statistics
     synthetic_data = generate_synthetic(
