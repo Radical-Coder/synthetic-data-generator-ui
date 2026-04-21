@@ -1,0 +1,13 @@
+customer_id,segment,region,score,orders,last_seen,is_active,email
+1001,Enterprise,North,82.4,14,2025-01-10 08:15:00,true,ops1@sampleco.com
+1002,SMB,West,67.2,7,2025-01-11 09:20:00,false,team2@sampleco.com
+1003,Enterprise,South,91.8,19,2025-01-13 11:05:00,true,lead3@sampleco.com
+1004,Mid-Market,North,74.3,11,2025-01-15 13:10:00,true,growth4@sampleco.com
+1005,SMB,East,58.6,5,2025-01-18 10:45:00,false,sales5@sampleco.com
+1006,Enterprise,West,88.1,16,2025-01-21 15:30:00,true,ops6@sampleco.com
+1007,Mid-Market,South,79.4,12,2025-01-23 17:00:00,true,pm7@sampleco.com
+1008,SMB,North,61.5,6,2025-01-24 08:40:00,false,team8@sampleco.com
+1009,Enterprise,East,94.2,22,2025-01-26 12:00:00,true,lead9@sampleco.com
+1010,Mid-Market,West,71.9,9,2025-01-28 14:25:00,true,ops10@sampleco.com
+1011,SMB,South,55.1,4,2025-01-30 16:10:00,false,sales11@sampleco.com
+1012,Enterprise,North,89.7,17,2025-02-01 09:55:00,true,team12@sampleco.com
