@@ -1,9 +1,25 @@
-export default function Sidebar({ hasData, generationComplete, originalRows, syntheticRows }) {
+export default function Sidebar({
+  isOpen,
+  onClose,
+  hasData,
+  generationComplete,
+  originalRows,
+  syntheticRows
+}) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-close" aria-hidden="true">
+    <aside
+      id="app-sidebar"
+      className={`sidebar ${isOpen ? 'is-open' : 'is-collapsed'}`}
+      aria-hidden={!isOpen}
+    >
+      <button
+        type="button"
+        className="sidebar-close"
+        aria-label="Close sidebar"
+        onClick={onClose}
+      >
         ×
-      </div>
+      </button>
 
       <section className="sidebar-section">
         <h2>About</h2>

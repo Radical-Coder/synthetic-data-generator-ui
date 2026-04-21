@@ -291,6 +291,7 @@ function StreamlitMultiSelect({ label, options, selected, open, onToggleOpen, on
 export default function App() {
   const fileInputRef = useRef(null)
   const [activeTab, setActiveTab] = useState('upload')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [originalRows, setOriginalRows] = useState([])
   const [syntheticRows, setSyntheticRows] = useState([])
   const [sourceColumnInfo, setSourceColumnInfo] = useState({})
@@ -714,8 +715,21 @@ export default function App() {
     : NaN
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isSidebarOpen ? '' : 'is-sidebar-collapsed'}`}>
+      <button
+        type="button"
+        className="sidebar-open-button"
+        aria-label="Open sidebar"
+        aria-controls="app-sidebar"
+        aria-expanded={isSidebarOpen}
+        onClick={() => setIsSidebarOpen(true)}
+      >
+        Show sidebar
+      </button>
+
       <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
         hasData={hasData}
         generationComplete={generationComplete}
         originalRows={originalRows}
