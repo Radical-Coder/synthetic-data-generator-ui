@@ -320,18 +320,83 @@ a {
 
 .uploader-help {
   position: absolute;
-  top: -0.18rem;
+  top: 0;
   right: 0.35rem;
   z-index: 2;
+  transform: translateY(-58%);
+}
+
+.uploader-help .help-tooltip-trigger {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+}
+
+.help-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.help-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.1rem;
   height: 1.1rem;
   padding: 0;
   border: 1px solid #9ca3af;
   border-radius: 999px;
-  background: transparent;
+  background: #ffffff;
   color: #6b7280;
   font-size: 0.68rem;
   font-weight: 700;
+  line-height: 1;
+}
+
+.help-tooltip-trigger:focus-visible {
+  outline: 2px solid #1f77b4;
+  outline-offset: 2px;
+}
+
+.help-tooltip-bubble {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 30;
+  width: min(18rem, calc(100vw - 2rem));
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.55rem;
+  background: #31333f;
+  color: #ffffff;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.help-tooltip-bubble::before {
+  content: "";
+  position: absolute;
+  top: -0.3rem;
+  right: 0.65rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: #31333f;
+  transform: rotate(45deg);
+}
+
+.help-tooltip:hover .help-tooltip-bubble,
+.help-tooltip:focus-within .help-tooltip-bubble {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.uploader-help .help-tooltip-bubble {
+  right: -0.15rem;
 }
 
 .uploader-dropzone {
@@ -503,9 +568,18 @@ a {
   color: #31333f;
 }
 
-.field span,
-.checkbox-field span {
+.field > span,
+.checkbox-field > span,
+.field > .field-label-row,
+.checkbox-field > .field-label-row {
   font-size: 1rem;
+}
+
+.field-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
 }
 
 .field input[type="number"],
@@ -648,6 +722,10 @@ a {
   gap: 0.2rem 0.5rem;
 }
 
+.range-field-label {
+  align-self: center;
+}
+
 .range-value-display {
   color: #ff4b4b;
   font-size: 0.82rem;
@@ -705,17 +783,10 @@ a {
   color: #31333f;
 }
 
-.streamlit-help-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.streamlit-multiselect-label-row .help-tooltip-trigger {
   width: 0.95rem;
   height: 0.95rem;
-  border: 1px solid #9ca3af;
-  border-radius: 999px;
-  color: #6b7280;
   font-size: 0.62rem;
-  font-weight: 700;
 }
 
 .streamlit-multiselect-trigger {

@@ -217,14 +217,48 @@ function truncateAxisLabel(value, limit = 12) {
   return text.length > limit ? `${text.slice(0, limit)}…` : text
 }
 
-function StreamlitMultiSelect({ label, options, selected, open, onToggleOpen, onToggleOption, onClearAll }) {
+function HelpTooltip({ text, label = 'Help', className = '', bubbleClassName = '' }) {
+  return (
+    <span className={`help-tooltip ${className}`.trim()}>
+      <button
+        type="button"
+        className="help-tooltip-trigger"
+        aria-label={label}
+        title={text}
+      >
+        ?
+      </button>
+      <span className={`help-tooltip-bubble ${bubbleClassName}`.trim()} role="tooltip">
+        {text}
+      </span>
+    </span>
+  )
+}
+
+function FieldLabel({ text, helpText, className = '' }) {
+  return (
+    <span className={`field-label-row ${className}`.trim()}>
+      <span>{text}</span>
+      {helpText ? <HelpTooltip text={helpText} label={`Help for ${text}`} /> : null}
+    </span>
+  )
+}
+
+function StreamlitMultiSelect({
+  label,
+  helpText,
+  options,
+  selected,
+  open,
+  onToggleOpen,
+  onToggleOption,
+  onClearAll
+}) {
   return (
     <div className="streamlit-multiselect">
       <div className="streamlit-multiselect-label-row">
         <label className="streamlit-multiselect-label">{label}</label>
-        <span className="streamlit-help-icon" aria-hidden="true">
-          ?
-        </span>
+        {helpText ? <HelpTooltip text={helpText} label={`Help for ${label}`} /> : null}
       </div>
       <button
         type="button"
@@ -767,9 +801,11 @@ export default function App() {
               <h2>Step 1: Upload Your Dataset</h2>
               <p className="section-copy">Choose a CSV or JSON file</p>
               <div className="uploader-frame">
-                <button type="button" className="uploader-help" aria-label="Upload help">
-                  ?
-                </button>
+                <HelpTooltip
+                  text="Upload a CSV or flat JSON file. The tool will automatically detect column types."
+                  label="Upload help"
+                  className="uploader-help"
+                />
                 <div
                   className="uploader-dropzone"
                   onClick={openFilePicker}
@@ -897,7 +933,10 @@ export default function App() {
                   <h2>Step 2: Configure Generation Parameters</h2>
                   <div className="form-grid two-column">
                     <label className="field field-stepper">
-                      <span>Number of rows to generate</span>
+                      <FieldLabel
+                        text="Number of rows to generate"
+                        helpText="How many synthetic rows to generate"
+                      />
                       <div className="stepper-input">
                         <input
                           type="number"
@@ -929,7 +968,10 @@ export default function App() {
                     </label>
 
                     <label className="field field-stepper">
-                      <span>Random Seed (for reproducibility)</span>
+                      <FieldLabel
+                        text="Random Seed (for reproducibility)"
+                        helpText="Use same seed to get identical results"
+                      />
                       <div className="stepper-input">
                         <input
                           type="number"
@@ -964,7 +1006,11 @@ export default function App() {
                     <summary>Advanced Options</summary>
                     <div className="details-content">
                       <label className="field range-field">
-                        <span>Maximum GMM Components</span>
+                        <FieldLabel
+                          text="Maximum GMM Components"
+                          helpText="Maximum Gaussian components for continuous data modeling"
+                          className="range-field-label"
+                        />
                         <div className="range-value-display">{config.maxComponents}</div>
                         <input
                           type="range"
@@ -985,7 +1031,11 @@ export default function App() {
                       </label>
 
                       <label className="field range-field">
-                        <span>Discrete Detection Threshold</span>
+                        <FieldLabel
+                          text="Discrete Detection Threshold"
+                          helpText="Unique value ratio below which numeric columns are treated as discrete"
+                          className="range-field-label"
+                        />
                         <div className="range-value-display">{config.discreteThreshold.toFixed(2)}</div>
                         <input
                           type="range"
@@ -1012,7 +1062,10 @@ export default function App() {
                             }))
                           }
                         />
-                        <span>Use Reference Tables</span>
+                        <FieldLabel
+                          text="Use Reference Tables"
+                          helpText="Provide custom lists of valid values for categorical columns"
+                        />
                       </label>
 
                       {config.useReferenceTables ? (
@@ -1023,7 +1076,10 @@ export default function App() {
                           </p>
                           {referenceableColumns.length ? (
                             <label className="field">
-                              <span>Select columns to add reference tables for:</span>
+                              <FieldLabel
+                                text="Select columns to add reference tables for:"
+                                helpText="Only categorical columns are shown"
+                              />
                               <select
                                 value={referencePickerValue}
                                 onChange={(event) => {
@@ -1156,6 +1212,7 @@ export default function App() {
                     <h3>Select Columns to Visualize</h3>
                     <StreamlitMultiSelect
                       label="Choose columns for detailed comparison"
+                      helpText="Select which columns you want to see detailed visualizations for"
                       options={Object.keys(columnInfo)}
                       selected={selectedColumns}
                       open={isQualitySelectorOpen}
