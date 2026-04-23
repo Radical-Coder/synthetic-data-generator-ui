@@ -816,7 +816,11 @@ export function summarizeSourceColumns(rows) {
       const nonEmpty = rawValues.filter((value) => toText(value) !== '')
       const numericValues = nonEmpty.map(parseMaybeNumber).filter((value) => value !== null)
 
-      if (!nonEmpty.length || numericValues.length === nonEmpty.length) {
+      if (!nonEmpty.length) {
+        return summary
+      }
+
+      if (numericValues.length === nonEmpty.length) {
         summary.numeric += 1
       } else {
         summary.categorical += 1

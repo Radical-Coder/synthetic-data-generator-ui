@@ -849,13 +849,14 @@ export default function App() {
       const realValues = getNumericValues(originalRows, column)
       const syntheticValues = getNumericValues(syntheticRows, column)
 
-      if (!realValues.length || !syntheticValues.length) {
+      if (!realValues.length && !syntheticValues.length) {
         return null
       }
 
       const realMean = mean(realValues)
       const syntheticMean = mean(syntheticValues)
       const meanDiffPct = relativeDelta(realMean, syntheticMean)
+      const hasComparableValues = realValues.length > 0 && syntheticValues.length > 0
 
       return {
         column,
@@ -863,7 +864,10 @@ export default function App() {
         syntheticMean,
         meanDiffPct,
         meanTone: toneForDelta(meanDiffPct),
-        boxPlotData: buildBoxPlotData(realValues, syntheticValues)
+        realCount: realValues.length,
+        syntheticCount: syntheticValues.length,
+        hasComparableValues,
+        boxPlotData: hasComparableValues ? buildBoxPlotData(realValues, syntheticValues) : []
       }
     })
     .filter(Boolean)
@@ -1473,13 +1477,13 @@ export default function App() {
                     </div>
                   </div>
 
-                  {numericBoxPlotColumns.length ? (
-                    <div className="quality-section">
-                      <h3>Numeric Outlier Box Plots</h3>
-                      <p className="section-copy">
-                        Quick view of numeric spread, medians, whiskers, and outlier dots for every detected numeric
-                        column.
-                      </p>
+                  <div className="quality-section">
+                    <h3>Box Plot / Outlier Analysis</h3>
+                    <p className="section-copy">
+                      Quick view of numeric spread, medians, whiskers, and outlier dots for comparable numeric
+                      columns.
+                    </p>
+                    {numericBoxPlotColumns.length ? (
                       <div className="comparison-card-grid comparison-card-grid-numeric">
                         {numericBoxPlotColumns.map((item) => (
                           <article key={`quality-box-${item.column}`} className="comparison-card">
@@ -1492,12 +1496,28 @@ export default function App() {
                                 Mean {item.meanTone.label}
                               </span>
                             </div>
-                            <BoxPlotComparison data={item.boxPlotData} />
+                            <div className="comparison-pill-row">
+                              <span className="comparison-pill">Real numeric values {item.realCount}</span>
+                              <span className="comparison-pill">Synthetic numeric values {item.syntheticCount}</span>
+                            </div>
+                            {item.hasComparableValues ? (
+                              <BoxPlotComparison data={item.boxPlotData} />
+                            ) : (
+                              <div className="empty-state">
+                                This column does not have comparable numeric values in both datasets, so a box plot
+                                cannot be drawn.
+                              </div>
+                            )}
                           </article>
                         ))}
                       </div>
-                    </div>
-                  ) : null}
+                    ) : (
+                      <div className="empty-state">
+                        No comparable numeric values were found for box plot analysis. If a column should be numeric,
+                        use the data type override before generation and regenerate the synthetic dataset.
+                      </div>
+                    )}
+                  </div>
 
                   <div className="quality-section">
                     <h3>Select Columns to Visualize</h3>
