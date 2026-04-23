@@ -1,9 +1,5 @@
 import { useDeferredValue, useRef, useState, useTransition } from 'react'
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Legend,
   Line,
@@ -17,8 +13,9 @@ import DataTable from './components/DataTable'
 import Sidebar from './components/Sidebar'
 import { BENCHMARK_OPTIONS, TAB_ITEMS, TYPE_STYLES } from './data/constants'
 import {
-  buildBoxSummary,
+  buildBoxPlotData,
   buildDetectionSummary,
+  buildColumnOverrideInfo,
   buildFrequencyData,
   buildHistogramData,
   datetimeComparisonRows,
@@ -51,6 +48,16 @@ const BENCHMARK_DEFAULTS = {
   500000: false,
   1000000: false
 }
+
+const TYPE_OVERRIDE_OPTIONS = [
+  'continuous_numeric',
+  'discrete_numeric',
+  'categorical',
+  'boolean',
+  'datetime',
+  'email',
+  'phone'
+]
 
 function wait(ms) {
   return new Promise((resolve) => {
@@ -322,6 +329,132 @@ function StreamlitMultiSelect({
   )
 }
 
+function BoxPlotComparison({ data }) {
+  if (!data.length) {
+    return <div className="empty-state">Not enough numeric values to build a box plot.</div>
+  }
+
+  const width = 760
+  const height = 260
+  const left = 112
+  const right = 42
+  const top = 38
+  const plotWidth = width - left - right
+  const axisY = 218
+  const allValues = data.flatMap((series) => [
+    series.min,
+    series.max,
+    series.lowerWhisker,
+    series.upperWhisker,
+    ...series.outliers
+  ])
+  const rawMin = Math.min(...allValues)
+  const rawMax = Math.max(...allValues)
+  const padding = rawMax === rawMin ? 1 : (rawMax - rawMin) * 0.08
+  const domainMin = rawMin - padding
+  const domainMax = rawMax + padding
+  const domainSpan = domainMax - domainMin || 1
+  const scaleX = (value) => left + ((value - domainMin) / domainSpan) * plotWidth
+  const ticks = Array.from({ length: 5 }, (_, index) => domainMin + (domainSpan * index) / 4)
+
+  return (
+    <div className="box-plot-card">
+      <svg className="box-plot-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Real and synthetic box plot with outlier dots">
+        <line className="box-plot-axis" x1={left} x2={width - right} y1={axisY} y2={axisY} />
+        {ticks.map((tick) => {
+          const x = scaleX(tick)
+          return (
+            <g key={tick}>
+              <line className="box-plot-grid" x1={x} x2={x} y1={top - 12} y2={axisY} />
+              <line className="box-plot-axis-tick" x1={x} x2={x} y1={axisY} y2={axisY + 6} />
+              <text className="box-plot-axis-label" x={x} y={axisY + 24} textAnchor="middle">
+                {formatStat(tick)}
+              </text>
+            </g>
+          )
+        })}
+
+        {data.map((series, index) => {
+          const y = top + index * 82 + 32
+          const boxTop = y - 17
+          const boxHeight = 34
+          const outliersToShow = series.outliers
+
+          return (
+            <g key={series.label}>
+              <text className="box-plot-series-label" x={0} y={y + 5}>
+                {series.label}
+              </text>
+              <line
+                className={`box-plot-whisker is-${index === 0 ? 'real' : 'synthetic'}`}
+                x1={scaleX(series.lowerWhisker)}
+                x2={scaleX(series.upperWhisker)}
+                y1={y}
+                y2={y}
+              />
+              <line
+                className="box-plot-cap"
+                x1={scaleX(series.lowerWhisker)}
+                x2={scaleX(series.lowerWhisker)}
+                y1={y - 15}
+                y2={y + 15}
+              />
+              <line
+                className="box-plot-cap"
+                x1={scaleX(series.upperWhisker)}
+                x2={scaleX(series.upperWhisker)}
+                y1={y - 15}
+                y2={y + 15}
+              />
+              <rect
+                className={`box-plot-box is-${index === 0 ? 'real' : 'synthetic'}`}
+                x={scaleX(series.q1)}
+                y={boxTop}
+                width={Math.max(2, scaleX(series.q3) - scaleX(series.q1))}
+                height={boxHeight}
+                rx={5}
+              />
+              <line
+                className="box-plot-median"
+                x1={scaleX(series.median)}
+                x2={scaleX(series.median)}
+                y1={boxTop - 4}
+                y2={boxTop + boxHeight + 4}
+              />
+              {outliersToShow.map((value, outlierIndex) => (
+                <circle
+                  key={`${series.label}-${value}-${outlierIndex}`}
+                  className={`box-plot-outlier is-${index === 0 ? 'real' : 'synthetic'}`}
+                  cx={scaleX(value)}
+                  cy={y + ((outlierIndex % 5) - 2) * 3}
+                  r={3.8}
+                />
+              ))}
+              {series.outlierCount > outliersToShow.length ? (
+                <text className="box-plot-outlier-note" x={width - right} y={y - 23} textAnchor="end">
+                  showing {outliersToShow.length}/{series.outlierCount} outliers
+                </text>
+              ) : null}
+            </g>
+          )
+        })}
+      </svg>
+
+      <div className="box-plot-summary-grid">
+        {data.map((series) => (
+          <div key={`${series.label}-summary`} className="box-plot-summary-item">
+            <strong>{series.label}</strong>
+            <span>
+              median {formatStat(series.median)} · IQR {formatStat(series.q1)}-{formatStat(series.q3)} · outliers{' '}
+              {series.outlierCount}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const fileInputRef = useRef(null)
   const [activeTab, setActiveTab] = useState('upload')
@@ -437,6 +570,7 @@ export default function App() {
 
     if (hasData) {
       setSourceColumnInfo(detectColumnInfo(originalRows, numericValue))
+      resetResults()
     }
   }
 
@@ -468,14 +602,16 @@ export default function App() {
     setStatusMessage('Step 1/3: Analyzing column types...')
     await wait(180)
 
-    const detected = detectColumnInfo(originalRows, config.discreteThreshold)
+    const reviewedColumnInfo = Object.keys(sourceColumnInfo).length
+      ? sourceColumnInfo
+      : detectColumnInfo(originalRows, config.discreteThreshold)
 
     setStatusMessage('Step 2/3: Generating synthetic data...')
     await wait(180)
 
     const generated = generateSyntheticRows({
       rows: originalRows,
-      columnInfo: detected,
+      columnInfo: reviewedColumnInfo,
       referenceTables: config.useReferenceTables ? referenceTables : {},
       numRows: config.numRows,
       seed: config.randomSeed
@@ -485,10 +621,10 @@ export default function App() {
     await wait(180)
 
     startTransition(() => {
-      setColumnInfo(detected)
+      setColumnInfo(reviewedColumnInfo)
       setSyntheticRows(generated)
       setGenerationComplete(true)
-      setSelectedColumns(Object.keys(detected).slice(0, 3))
+      setSelectedColumns(Object.keys(reviewedColumnInfo).slice(0, 3))
     })
 
     setStatusTone('success')
@@ -540,6 +676,37 @@ export default function App() {
     setReferencePickerValue('')
   }
 
+  function handleColumnTypeOverride(column, nextType) {
+    const overrideInfo = buildColumnOverrideInfo(originalRows, column, nextType, config.discreteThreshold)
+
+    startTransition(() => {
+      setSourceColumnInfo((current) => ({
+        ...current,
+        [column]: overrideInfo
+      }))
+      resetResults()
+    })
+  }
+
+  function resetColumnType(column) {
+    const detected = detectColumnInfo(originalRows, config.discreteThreshold)
+
+    startTransition(() => {
+      setSourceColumnInfo((current) => ({
+        ...current,
+        [column]: detected[column]
+      }))
+      resetResults()
+    })
+  }
+
+  function resetAllColumnTypes() {
+    startTransition(() => {
+      setSourceColumnInfo(detectColumnInfo(originalRows, config.discreteThreshold))
+      resetResults()
+    })
+  }
+
   function toggleBenchmark(size) {
     setBenchmarkSelection((current) => ({
       ...current,
@@ -554,7 +721,11 @@ export default function App() {
       return
     }
 
-    const detected = generationComplete ? columnInfo : detectColumnInfo(originalRows, config.discreteThreshold)
+    const detected = generationComplete
+      ? columnInfo
+      : Object.keys(sourceColumnInfo).length
+        ? sourceColumnInfo
+        : detectColumnInfo(originalRows, config.discreteThreshold)
     const nextResults = []
 
     for (let index = 0; index < selectedBenchmarkSizes.length; index += 1) {
@@ -613,6 +784,7 @@ export default function App() {
   }
 
   const detectionRows = buildDetectionSummary(columnInfo, config.useReferenceTables ? referenceTables : {})
+  const sourceDetectionRows = buildDetectionSummary(sourceColumnInfo, config.useReferenceTables ? referenceTables : {})
   const numericComparison = numericComparisonRows(originalRows, syntheticRows, columnInfo)
   const datetimeComparison = datetimeComparisonRows(originalRows, syntheticRows, columnInfo)
   const syntheticSizeMb = syntheticRows.length
@@ -668,7 +840,8 @@ export default function App() {
         stdDiffPct,
         meanTone: toneForDelta(meanDiffPct),
         stdTone: toneForDelta(stdDiffPct),
-        histogramData: buildHistogramData(realValues, syntheticValues, 10)
+        histogramData: buildHistogramData(realValues, syntheticValues, 10),
+        boxPlotData: buildBoxPlotData(realValues, syntheticValues)
       }
     })
 
@@ -925,7 +1098,7 @@ export default function App() {
                 </div>
 
                 <div className="section-block">
-                  <h2>Data Preview</h2>
+                  <h2>Preview of seed/sample data</h2>
                   <DataTable rows={originalRows} showIndex compact dataframe emptyValue="None" />
                 </div>
 
@@ -1140,6 +1313,75 @@ export default function App() {
                 </div>
 
                 <div className="section-block">
+                  <div className="section-header-row">
+                    <div>
+                      <h2>Review &amp; Override Detected Data Types</h2>
+                      <p className="section-copy">
+                        Confirm the detected column types before generation. Overrides change how the synthetic data
+                        is generated for that column.
+                      </p>
+                    </div>
+                    <button type="button" className="secondary-button" onClick={resetAllColumnTypes}>
+                      Reset all types
+                    </button>
+                  </div>
+
+                  <div className="type-override-list">
+                    {Object.entries(sourceColumnInfo).map(([column, details]) => {
+                      const style = TYPE_STYLES[details?.type] ?? TYPE_STYLES.unknown
+                      const originalStyle = TYPE_STYLES[details?.originalDetectedType] ?? null
+
+                      return (
+                        <div key={column} className="type-override-row">
+                          <div className="type-override-main">
+                            <div className="type-override-column">{column}</div>
+                            <div className="type-override-meta">
+                              Current: {style.emoji} {style.label}
+                              {details?.overridden && originalStyle ? (
+                                <span> • auto was {originalStyle.emoji} {originalStyle.label}</span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <label className="field type-override-select">
+                            <span className="sr-only">Override type for {column}</span>
+                            <select
+                              value={details?.type ?? 'categorical'}
+                              onChange={(event) => handleColumnTypeOverride(column, event.target.value)}
+                            >
+                              {TYPE_OVERRIDE_OPTIONS.map((type) => {
+                                const optionStyle = TYPE_STYLES[type] ?? TYPE_STYLES.unknown
+                                return (
+                                  <option key={type} value={type}>
+                                    {optionStyle.emoji} {optionStyle.label}
+                                  </option>
+                                )
+                              })}
+                            </select>
+                          </label>
+
+                          <button
+                            type="button"
+                            className="table-clear-button"
+                            disabled={!details?.overridden && !details?.overrideRequested}
+                            onClick={() => resetColumnType(column)}
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <details className="details-panel compact-details">
+                    <summary>Detected data type summary</summary>
+                    <div className="details-content">
+                      <DataTable rows={sourceDetectionRows} maxRows={sourceDetectionRows.length || 10} showIndex dataframe />
+                    </div>
+                  </details>
+                </div>
+
+                <div className="section-block">
                   <h2>Step 3: Generate Synthetic Data</h2>
                   {Object.keys(referenceTables).length && config.useReferenceTables ? (
                     <div className="message-banner is-success">
@@ -1271,47 +1513,37 @@ export default function App() {
                             </div>
 
                             <div className="quality-chart-block">
-                                <h4>Distribution Comparison</h4>
-                                <ResponsiveContainer width="100%" height={320}>
-                                  <AreaChart data={buildHistogramData(numericReal, numericSynthetic)}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="label" hide />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Area
-                                      type="monotone"
-                                      dataKey="real"
-                                      stackId="1"
-                                      stroke="#1f77b4"
-                                      fill="#9ecae1"
-                                      name="Real Data"
-                                    />
-                                    <Area
-                                      type="monotone"
-                                      dataKey="synthetic"
-                                      stackId="2"
-                                      stroke="#d62728"
-                                      fill="#f7b6b2"
-                                      name="Synthetic Data"
-                                    />
-                                  </AreaChart>
-                                </ResponsiveContainer>
+                              <h4>Pattern Similarity</h4>
+                              <ResponsiveContainer width="100%" height={320}>
+                                <LineChart data={buildHistogramData(numericReal, numericSynthetic)}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="label" hide />
+                                  <YAxis />
+                                  <Tooltip />
+                                  <Legend />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="real"
+                                    stroke="#1f77b4"
+                                    strokeWidth={3}
+                                    dot={false}
+                                    name="Real Data"
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="synthetic"
+                                    stroke="#d62728"
+                                    strokeWidth={3}
+                                    dot={false}
+                                    name="Synthetic Data"
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
                             </div>
 
                             <div className="quality-chart-block">
-                                <h4>Box Summary</h4>
-                                <ResponsiveContainer width="100%" height={320}>
-                                  <BarChart data={buildBoxSummary(numericReal, numericSynthetic)}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="label" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar dataKey="real" fill="#1f77b4" name="Real Data" />
-                                    <Bar dataKey="synthetic" fill="#d62728" name="Synthetic Data" />
-                                  </BarChart>
-                                </ResponsiveContainer>
+                              <h4>Outlier Box Plot</h4>
+                              <BoxPlotComparison data={buildBoxPlotData(numericReal, numericSynthetic)} />
                             </div>
                           </>
                         ) : null}
@@ -1338,9 +1570,9 @@ export default function App() {
                             </div>
 
                             <div className="quality-chart-block">
-                              <h4>{column} - Frequency Comparison</h4>
+                              <h4>{column} - Pattern Similarity</h4>
                               <ResponsiveContainer width="100%" height={290}>
-                                <BarChart
+                                <LineChart
                                   data={buildFrequencyData(categoricalReal, categoricalSynthetic)}
                                   margin={{ top: 8, right: 48, left: 0, bottom: 26 }}
                                 >
@@ -1361,9 +1593,23 @@ export default function App() {
                                     verticalAlign="middle"
                                     wrapperStyle={{ fontSize: '12px', paddingLeft: '12px' }}
                                   />
-                                  <Bar dataKey="real" fill="#1f77b4" name="Real Data" />
-                                  <Bar dataKey="synthetic" fill="#d62728" name="Synthetic Data" />
-                                </BarChart>
+                                  <Line
+                                    type="monotone"
+                                    dataKey="real"
+                                    stroke="#1f77b4"
+                                    strokeWidth={3}
+                                    dot={{ r: 3 }}
+                                    name="Real Data"
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="synthetic"
+                                    stroke="#d62728"
+                                    strokeWidth={3}
+                                    dot={{ r: 3 }}
+                                    name="Synthetic Data"
+                                  />
+                                </LineChart>
                               </ResponsiveContainer>
                             </div>
                           </>
@@ -1505,36 +1751,41 @@ export default function App() {
                                 </div>
 
                                 <div className="comparison-chart-shell">
-                                  <h5>Distribution overlap</h5>
+                                  <h5>Pattern similarity</h5>
                                   {item.histogramData.length ? (
                                     <ResponsiveContainer width="100%" height={240}>
-                                      <AreaChart data={item.histogramData}>
+                                      <LineChart data={item.histogramData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="label" hide />
                                         <YAxis />
                                         <Tooltip />
                                         <Legend />
-                                        <Area
+                                        <Line
                                           type="monotone"
                                           dataKey="real"
                                           stroke="#1f77b4"
-                                          fill="#9ecae1"
-                                          fillOpacity={0.38}
+                                          strokeWidth={3}
+                                          dot={false}
                                           name="Real Data"
                                         />
-                                        <Area
+                                        <Line
                                           type="monotone"
                                           dataKey="synthetic"
                                           stroke="#d62728"
-                                          fill="#f7b6b2"
-                                          fillOpacity={0.34}
+                                          strokeWidth={3}
+                                          dot={false}
                                           name="Synthetic Data"
                                         />
-                                      </AreaChart>
+                                      </LineChart>
                                     </ResponsiveContainer>
                                   ) : (
                                     <div className="empty-state">Not enough numeric values to compare.</div>
                                   )}
+                                </div>
+
+                                <div className="comparison-chart-shell">
+                                  <h5>Outlier box plot</h5>
+                                  <BoxPlotComparison data={item.boxPlotData} />
                                 </div>
                               </article>
                             )
@@ -1609,10 +1860,10 @@ export default function App() {
                               </div>
 
                               <div className="comparison-chart-shell">
-                                <h5>Frequency comparison</h5>
+                                <h5>Pattern similarity</h5>
                                 {item.frequencyData.length ? (
                                   <ResponsiveContainer width="100%" height={260}>
-                                    <BarChart
+                                    <LineChart
                                       data={item.frequencyData}
                                       margin={{ top: 8, right: 16, left: 0, bottom: 58 }}
                                     >
@@ -1629,9 +1880,23 @@ export default function App() {
                                       <YAxis />
                                       <Tooltip />
                                       <Legend />
-                                      <Bar dataKey="real" fill="#1f77b4" name="Real Data" />
-                                      <Bar dataKey="synthetic" fill="#d62728" name="Synthetic Data" />
-                                    </BarChart>
+                                      <Line
+                                        type="monotone"
+                                        dataKey="real"
+                                        stroke="#1f77b4"
+                                        strokeWidth={3}
+                                        dot={{ r: 3 }}
+                                        name="Real Data"
+                                      />
+                                      <Line
+                                        type="monotone"
+                                        dataKey="synthetic"
+                                        stroke="#d62728"
+                                        strokeWidth={3}
+                                        dot={{ r: 3 }}
+                                        name="Synthetic Data"
+                                      />
+                                    </LineChart>
                                   </ResponsiveContainer>
                                 ) : (
                                   <div className="empty-state">No category frequencies available to compare.</div>

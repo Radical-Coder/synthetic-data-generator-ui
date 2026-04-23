@@ -440,10 +440,127 @@ export function detectColumnInfo(rows, discreteThreshold = 0.05) {
   return info
 }
 
+export function buildColumnOverrideInfo(rows, column, requestedType, discreteThreshold = 0.05) {
+  const autoDetected = detectColumnInfo(rows, discreteThreshold)[column] ?? {
+    type: 'empty',
+    method: 'skip'
+  }
+  const nonEmpty = rows.map((row) => row[column]).filter((value) => toText(value) !== '')
+  const textValues = nonEmpty.map((value) => toText(value))
+  const numericValues = nonEmpty.map(parseMaybeNumber).filter((value) => value !== null)
+  const booleanValues = nonEmpty.map(toBooleanToken).filter((value) => value !== null)
+  const dateValues = nonEmpty.map(parseMaybeDate).filter(Boolean)
+  const validEmails = textValues.filter((value) => EMAIL_PATTERN.test(value))
+  const validPhones = textValues.filter((value) => PHONE_PATTERN.test(value))
+
+  const base = {
+    overridden: true,
+    originalDetectedType: autoDetected.type
+  }
+
+  if (requestedType === 'continuous_numeric' && numericValues.length) {
+    const mean = average(numericValues)
+    const deviation = stddev(numericValues, mean)
+
+    return {
+      ...base,
+      type: 'continuous_numeric',
+      method: 'manual_override:gmm',
+      stats: {
+        mean,
+        std: deviation,
+        min: Math.min(...numericValues),
+        max: Math.max(...numericValues),
+        q1: quantile(numericValues, 0.25),
+        median: quantile(numericValues, 0.5),
+        q3: quantile(numericValues, 0.75),
+        decimals: countDecimals(numericValues)
+      }
+    }
+  }
+
+  if (requestedType === 'discrete_numeric' && numericValues.length) {
+    return {
+      ...base,
+      type: 'discrete_numeric',
+      method: 'manual_override:categorical_sampling',
+      frequencies: countFrequencies(numericValues),
+      stats: {
+        min: Math.min(...numericValues),
+        max: Math.max(...numericValues)
+      }
+    }
+  }
+
+  if (requestedType === 'categorical') {
+    return {
+      ...base,
+      type: 'categorical',
+      method: 'manual_override:categorical_sampling',
+      frequencies: countFrequencies(textValues)
+    }
+  }
+
+  if (requestedType === 'boolean') {
+    return {
+      ...base,
+      type: 'boolean',
+      method: 'manual_override:categorical_sampling',
+      frequencies: countFrequencies(booleanValues.length ? booleanValues : textValues)
+    }
+  }
+
+  if (requestedType === 'datetime' && dateValues.length) {
+    const timestamps = dateValues.map((value) => value.getTime())
+
+    return {
+      ...base,
+      type: 'datetime',
+      method: 'manual_override:datetime_generation',
+      min: Math.min(...timestamps),
+      max: Math.max(...timestamps),
+      dateOnly: textValues.every((value) => DATE_ONLY_PATTERN.test(value))
+    }
+  }
+
+  if (requestedType === 'email') {
+    const sourceEmails = validEmails.length ? validEmails : textValues
+    const fragments = sourceEmails
+      .map((value) => value.split('@')[0] ?? value)
+      .filter(Boolean)
+      .slice(0, 200)
+
+    return {
+      ...base,
+      type: 'email',
+      method: 'manual_override:email_generation',
+      frequencies: countFrequencies(sourceEmails),
+      domains: countFrequencies(validEmails.map((value) => value.split('@')[1] ?? 'example.com')),
+      fragments: fragments.length ? fragments : ['user']
+    }
+  }
+
+  if (requestedType === 'phone') {
+    return {
+      ...base,
+      type: 'phone',
+      method: 'manual_override:phone_generation',
+      frequencies: countFrequencies(validPhones.length ? validPhones : textValues),
+      patterns: (validPhones.length ? validPhones : textValues).slice(0, 100)
+    }
+  }
+
+  return {
+    ...autoDetected,
+    overrideRequested: requestedType,
+    overrideWarning: `Could not safely coerce ${column} to ${requestedType}; using detected ${autoDetected.type}.`
+  }
+}
+
 export function buildDetectionSummary(columnInfo, referenceTables = {}) {
   return Object.entries(columnInfo).map(([column, details]) => ({
     Column: column,
-    'Detected Type': details.type,
+    'Detected Type': details.overridden ? `${details.type} (manual)` : details.type,
     'Generation Method': referenceTables[column]?.length
       ? `reference_table_sampling (${referenceTables[column].length.toLocaleString()} values)`
       : details.method
@@ -570,18 +687,46 @@ export function buildHistogramData(realValues, syntheticValues, bins = 12) {
   return data
 }
 
-export function buildBoxSummary(realValues, syntheticValues) {
-  if (!realValues.length || !syntheticValues.length) {
-    return []
+function buildSingleBoxPlotStats(label, values) {
+  if (!values.length) {
+    return null
   }
 
+  const sorted = [...values].sort((a, b) => a - b)
+  const q1 = quantile(sorted, 0.25)
+  const median = quantile(sorted, 0.5)
+  const q3 = quantile(sorted, 0.75)
+  const iqr = q3 - q1
+  const lowerFence = q1 - 1.5 * iqr
+  const upperFence = q3 + 1.5 * iqr
+  const nonOutliers = sorted.filter((value) => value >= lowerFence && value <= upperFence)
+  const outliers = sorted.filter((value) => value < lowerFence || value > upperFence)
+  const displayedOutliers = outliers.length > 48
+    ? outliers.filter((_, index) => index % Math.ceil(outliers.length / 48) === 0)
+    : outliers
+
+  return {
+    label,
+    count: sorted.length,
+    min: sorted[0],
+    q1,
+    median,
+    q3,
+    max: sorted[sorted.length - 1],
+    lowerFence,
+    upperFence,
+    lowerWhisker: nonOutliers[0] ?? sorted[0],
+    upperWhisker: nonOutliers[nonOutliers.length - 1] ?? sorted[sorted.length - 1],
+    outliers: displayedOutliers,
+    outlierCount: outliers.length
+  }
+}
+
+export function buildBoxPlotData(realValues, syntheticValues) {
   return [
-    { label: 'Min', real: Math.min(...realValues), synthetic: Math.min(...syntheticValues) },
-    { label: 'Q1', real: quantile(realValues, 0.25), synthetic: quantile(syntheticValues, 0.25) },
-    { label: 'Median', real: quantile(realValues, 0.5), synthetic: quantile(syntheticValues, 0.5) },
-    { label: 'Q3', real: quantile(realValues, 0.75), synthetic: quantile(syntheticValues, 0.75) },
-    { label: 'Max', real: Math.max(...realValues), synthetic: Math.max(...syntheticValues) }
-  ]
+    buildSingleBoxPlotStats('Real Data', realValues),
+    buildSingleBoxPlotStats('Synthetic Data', syntheticValues)
+  ].filter(Boolean)
 }
 
 export function buildFrequencyData(realValues, syntheticValues, limit = 12) {
