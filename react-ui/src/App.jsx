@@ -1450,6 +1450,32 @@ export default function App() {
                     </div>
                   </div>
 
+                  {numericComparisonColumns.length ? (
+                    <div className="quality-section">
+                      <h3>Numeric Outlier Box Plots</h3>
+                      <p className="section-copy">
+                        Quick view of numeric spread, medians, whiskers, and outlier dots for every detected numeric
+                        column.
+                      </p>
+                      <div className="comparison-card-grid comparison-card-grid-numeric">
+                        {numericComparisonColumns.map((item) => (
+                          <article key={`quality-box-${item.column}`} className="comparison-card">
+                            <div className="comparison-card-head">
+                              <div>
+                                <h4>{item.column}</h4>
+                                <p className="comparison-card-copy">Real vs synthetic numeric outliers</p>
+                              </div>
+                              <span className={`comparison-badge is-${item.meanTone.tone}`}>
+                                Mean {item.meanTone.label}
+                              </span>
+                            </div>
+                            <BoxPlotComparison data={item.boxPlotData} />
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="quality-section">
                     <h3>Select Columns to Visualize</h3>
                     <StreamlitMultiSelect
