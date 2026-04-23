@@ -844,6 +844,29 @@ export default function App() {
         boxPlotData: buildBoxPlotData(realValues, syntheticValues)
       }
     })
+  const numericBoxPlotColumns = (originalRows[0] ? Object.keys(originalRows[0]) : [])
+    .map((column) => {
+      const realValues = getNumericValues(originalRows, column)
+      const syntheticValues = getNumericValues(syntheticRows, column)
+
+      if (!realValues.length || !syntheticValues.length) {
+        return null
+      }
+
+      const realMean = mean(realValues)
+      const syntheticMean = mean(syntheticValues)
+      const meanDiffPct = relativeDelta(realMean, syntheticMean)
+
+      return {
+        column,
+        realMean,
+        syntheticMean,
+        meanDiffPct,
+        meanTone: toneForDelta(meanDiffPct),
+        boxPlotData: buildBoxPlotData(realValues, syntheticValues)
+      }
+    })
+    .filter(Boolean)
 
   const categoricalComparisonColumns = Object.entries(columnInfo)
     .filter(([, details]) => ['categorical', 'boolean', 'email', 'phone'].includes(details.type))
@@ -1450,7 +1473,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {numericComparisonColumns.length ? (
+                  {numericBoxPlotColumns.length ? (
                     <div className="quality-section">
                       <h3>Numeric Outlier Box Plots</h3>
                       <p className="section-copy">
@@ -1458,7 +1481,7 @@ export default function App() {
                         column.
                       </p>
                       <div className="comparison-card-grid comparison-card-grid-numeric">
-                        {numericComparisonColumns.map((item) => (
+                        {numericBoxPlotColumns.map((item) => (
                           <article key={`quality-box-${item.column}`} className="comparison-card">
                             <div className="comparison-card-head">
                               <div>
