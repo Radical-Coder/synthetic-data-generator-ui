@@ -49,6 +49,11 @@ const BENCHMARK_DEFAULTS = {
   1000000: false
 }
 
+const DEMO_DATASET = {
+  fileName: 'stress-test-synthetic-seed.csv',
+  url: '/demo/stress-test-synthetic-seed.csv'
+}
+
 const TYPE_OVERRIDE_OPTIONS = [
   'continuous_numeric',
   'discrete_numeric',
@@ -496,6 +501,32 @@ export default function App() {
     setBenchmarkResults([])
   }
 
+  function loadParsedDataset(parsed, fileName) {
+    const detected = detectColumnInfo(parsed.rows, config.discreteThreshold)
+
+    startTransition(() => {
+      setOriginalRows(parsed.rows)
+      setUploadMeta({
+        fileName,
+        rows: parsed.rows.length,
+        columns: parsed.columns.length,
+        fileSizeKb: parsed.fileSizeKb,
+        nestedColumns: parsed.nestedColumns
+      })
+      setSourceColumnInfo(detected)
+      setSelectedColumns(parsed.columns.slice(0, 3))
+      setConfig((current) => ({
+        ...current,
+        numRows: Math.min(1000, parsed.rows.length || 1000)
+      }))
+      setReferenceTables({})
+      setSelectedReferenceColumns([])
+      setReferencePickerValue('')
+      setIsQualitySelectorOpen(false)
+      resetResults()
+    })
+  }
+
   async function handleDatasetUpload(event) {
     const file = event.target.files?.[0]
     if (!file) {
@@ -508,28 +539,7 @@ export default function App() {
 
     try {
       const parsed = await parseUploadedFile(file)
-      const detected = detectColumnInfo(parsed.rows, config.discreteThreshold)
-
-      startTransition(() => {
-        setOriginalRows(parsed.rows)
-        setUploadMeta({
-          fileName: file.name,
-          rows: parsed.rows.length,
-          columns: parsed.columns.length,
-          fileSizeKb: parsed.fileSizeKb,
-          nestedColumns: parsed.nestedColumns
-        })
-        setSourceColumnInfo(detected)
-        setSelectedColumns(parsed.columns.slice(0, 3))
-        setConfig((current) => ({
-          ...current,
-          numRows: Math.min(1000, parsed.rows.length || 1000)
-        }))
-        setReferenceTables({})
-        setSelectedReferenceColumns([])
-        setReferencePickerValue('')
-        resetResults()
-      })
+      loadParsedDataset(parsed, file.name)
 
       setStatusTone('info')
       setStatusMessage('')
@@ -539,6 +549,31 @@ export default function App() {
       setStatusMessage('Failed to load the file.')
     } finally {
       event.target.value = ''
+    }
+  }
+
+  async function handleUseDemoDataset() {
+    setStatusTone('info')
+    setStatusMessage('Loading demo dataset...')
+    setLoadError('')
+
+    try {
+      const response = await fetch(DEMO_DATASET.url)
+      if (!response.ok) {
+        throw new Error(`Could not load demo dataset (${response.status}).`)
+      }
+
+      const csvText = await response.text()
+      const demoFile = new File([csvText], DEMO_DATASET.fileName, { type: 'text/csv' })
+      const parsed = await parseUploadedFile(demoFile)
+      loadParsedDataset(parsed, DEMO_DATASET.fileName)
+
+      setStatusTone('info')
+      setStatusMessage('')
+    } catch (error) {
+      setLoadError(error.message)
+      setStatusTone('error')
+      setStatusMessage('Failed to load the demo dataset.')
     }
   }
 
@@ -1045,16 +1080,28 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    className="browse-files-button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      openFilePicker()
-                    }}
-                  >
-                    Browse files
-                  </button>
+                  <div className="uploader-actions">
+                    <button
+                      type="button"
+                      className="browse-files-button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openFilePicker()
+                      }}
+                    >
+                      Browse files
+                    </button>
+                    <button
+                      type="button"
+                      className="browse-files-button demo-data-button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleUseDemoDataset()
+                      }}
+                    >
+                      Use demo data set
+                    </button>
+                  </div>
                 </div>
                 <input
                   ref={fileInputRef}

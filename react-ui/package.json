@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 8502",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 8502"
+    "preview": "vite preview --host 127.0.0.1 --port 8502",
+    "generate:stress-csv": "python3 scripts/generate_stress_csv.py"
   },
   "dependencies": {
     "papaparse": "^5.5.3",

@@ -3,6 +3,7 @@
 :root {
   color-scheme: light;
   font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 18px;
   line-height: 1.5;
   color: #31333f;
   background: #ffffff;
@@ -21,6 +22,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: #ffffff;
+  font-size: 1rem;
 }
 
 button,
@@ -462,6 +464,26 @@ a {
   color: #31333f;
   font-size: 0.98rem;
   font-weight: 400;
+}
+
+.uploader-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.demo-data-button {
+  border-color: #b7d4ec;
+  background: #f1f8fd;
+  color: #0b5f9e;
+}
+
+.demo-data-button:hover {
+  border-color: #1f77b4;
+  background: #e4f2fb;
 }
 
 .section-block.upload-step .message-banner {
@@ -1749,6 +1771,171 @@ a {
   gap: 0.1rem;
 }
 
+/* Readability pass: client feedback asked for substantially larger app text. */
+.info-banner,
+.message-banner,
+.empty-state,
+.section-copy,
+.tab-button,
+.field > span,
+.checkbox-field > span,
+.field > .field-label-row,
+.checkbox-field > .field-label-row,
+.field input[type="number"],
+.field input[type="text"],
+.field input[type="file"],
+.field select,
+.primary-button,
+.secondary-button,
+.pill-button,
+.type-pill,
+.benchmark-checkbox,
+.browse-files-button,
+.uploader-title,
+.quality-type-line,
+.quality-stat-list,
+.comparison-detail-list,
+.download-preview-label,
+.reference-title,
+.streamlit-multiselect-option,
+.table-search input,
+.table-clear-button,
+.table-toolbar-meta,
+.app-footer {
+  font-size: 1.08rem;
+}
+
+.hero h1 {
+  font-size: 3.25rem;
+}
+
+.section-block.upload-step h2 {
+  font-size: 1.55rem;
+}
+
+.section-block h2,
+.section-block h3,
+.column-panel h3,
+.chart-card h4,
+.distribution-card h4 {
+  font-size: 1.65rem;
+}
+
+.section-block h3,
+.chart-card h4,
+.distribution-card h4,
+.quality-section h3,
+.quality-column-panel h3,
+.comparison-section h3,
+.download-section h3,
+.benchmark-section h3 {
+  font-size: 1.35rem;
+}
+
+.sidebar h2 {
+  font-size: 1.65rem;
+}
+
+.sidebar-intro,
+.sidebar li,
+.status-tile,
+.reference-caption,
+.uploader-subtitle,
+.uploaded-file-name,
+.uploaded-file-size,
+.metric-label,
+.metric-detail,
+.quality-metric-label,
+.quality-text-block h4,
+.quality-chart-block h4,
+.box-plot-summary-item,
+.comparison-card-copy,
+.comparison-panel-count,
+.comparison-badge,
+.comparison-pill,
+.comparison-detail-label,
+.comparison-chart-shell h5,
+.comparison-summary-label,
+.comparison-summary-detail,
+.benchmark-summary-label,
+.benchmark-summary-delta,
+.range-value-display,
+.range-endpoints,
+.type-override-meta,
+.streamlit-multiselect-label,
+.streamlit-multiselect-placeholder,
+.streamlit-chip,
+.streamlit-chip-close,
+.table-search,
+.data-table th,
+.data-table td {
+  font-size: 0.98rem;
+}
+
+.upload-metric-label,
+.quality-metric-label,
+.benchmark-summary-label {
+  font-size: 0.95rem;
+}
+
+.upload-metric-value,
+.quality-metric-value,
+.benchmark-summary-value {
+  font-size: 2.25rem;
+}
+
+.metric-value {
+  font-size: 1.7rem;
+}
+
+.comparison-summary-value {
+  font-size: 1.9rem;
+}
+
+.data-table.is-compact th,
+.data-table.is-compact td,
+.data-table.is-dataframe th,
+.data-table.is-dataframe td {
+  font-size: 0.88rem;
+}
+
+.data-table.is-dataframe th {
+  font-size: 0.84rem;
+}
+
+.help-tooltip-trigger,
+.streamlit-multiselect-label-row .help-tooltip-trigger {
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.78rem;
+}
+
+.help-tooltip-bubble {
+  font-size: 0.95rem;
+}
+
+.streamlit-multiselect-trigger {
+  min-height: 3rem;
+}
+
+.box-plot-axis-label,
+.box-plot-series-label,
+.box-plot-outlier-note {
+  font-size: 0.95rem;
+}
+
+.recharts-wrapper,
+.recharts-default-tooltip,
+.recharts-tooltip-label,
+.recharts-tooltip-item,
+.recharts-legend-item-text {
+  font-size: 0.98rem !important;
+}
+
+.recharts-cartesian-axis-tick-value {
+  font-size: 0.86rem;
+}
+
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1823,6 +2010,15 @@ a {
   .uploader-dropzone {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .uploader-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .uploader-actions .browse-files-button {
+    flex: 1 1 12rem;
   }
 
   .comparison-panel-head,
